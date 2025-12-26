@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  gaia:
+    image: agentbeats/gaia:v1.0.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HF_TOKEN=${HF_TOKEN}
+    ports:
+      - "9001:9001"  # Green agent (orchestrator)
+      - "9002:9002"  # Purple agent (task executor)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - gaia-cache:/root/.cache/agentbeats-gaia
+    restart: unless-stopped
+
+volumes:
+  gaia-cache:
+    driver: local

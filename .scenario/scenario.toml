@@ -1,0 +1,45 @@
+[scenario]
+name = "gaia"
+description = "GAIA Benchmark - General AI Assistants evaluation with multi-step reasoning and tool use"
+version = "1.0.0"
+
+# Green Agent (GAIA Evaluation Orchestrator)
+[[agents]]
+name = "GAIA Green Agent"
+card = "green_agent_card.toml"
+launcher_host = "0.0.0.0"
+launcher_port = 9001
+agent_host = "0.0.0.0"
+agent_port = 9001
+model_type = "openai"
+model_name = "gpt-4o"
+tools = []
+mcp_servers = []
+is_green = true
+
+# Participant requirement: purple agent (task executor)
+[[agents.participant_requirements]]
+  role = "purple_agent"
+  name = "gaia_task_executor"
+  required = true
+  participant_agent = "GAIA Purple Agent"
+
+# Purple Agent (GAIA Task Executor with Tools)
+[[agents]]
+name = "GAIA Purple Agent"
+card = "purple_agent_card.toml"
+launcher_host = "0.0.0.0"
+launcher_port = 9002
+agent_host = "0.0.0.0"
+agent_port = 9002
+model_type = "openai"
+model_name = "gpt-4o"
+tools = []  # Tools are built into the agent
+mcp_servers = []
+
+# Launch configuration
+[launch]
+mode = "separate"  # Options: "tmux", "separate", "current"
+tmux_session_name = "agentbeats-gaia"
+startup_interval = 2  # seconds between launching each component
+wait_for_services = true  # wait for services to be healthy before starting agents

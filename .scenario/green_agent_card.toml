@@ -1,0 +1,15 @@
+[agent]
+name = "gaia_green_agent"
+description = "Green agent for GAIA benchmark - orchestrates evaluation of purple agent on GAIA tasks with multi-step reasoning, web search, and calculations"
+version = "1.0.0"
+
+[[agent.skills]]
+id = "gaia_evaluation"
+name = "GAIA Evaluation Orchestration"
+description = "Manages GAIA benchmark evaluation workflow: loads tasks from Hugging Face, coordinates purple agent execution, scores results, and computes accuracy metrics"
+tags = ["evaluation", "orchestration", "gaia", "benchmark"]
+examples = [
+  "Evaluate agent on GAIA Level 1 validation tasks",
+  "Load GAIA dataset and score agent responses",
+  "Compute accuracy and performance metrics"
+]

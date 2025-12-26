@@ -1,0 +1,10 @@
+[agent]
+name = "gaia_green_agent"
+description = "Green agent for GAIA benchmark - orchestrates evaluation of purple agent on GAIA tasks"
+version = "1.0.0"
+
+[[agent.skills]]
+id = "gaia_evaluation"
+name = "GAIA Evaluation Orchestration"
+description = "Manages GAIA benchmark evaluation workflow, loads tasks, coordinates purple agent execution, and scores results"
+tags = ["evaluation", "orchestration", "gaia"]

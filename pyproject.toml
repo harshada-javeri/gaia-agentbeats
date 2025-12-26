@@ -1,0 +1,18 @@
+[project]
+name = "agentbeats-gaia"
+version = "0.1.0"
+description = "GAIA Benchmark implementation on AgentBeats - Evaluating General AI Assistants with multi-step reasoning and tool use"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "a2a-sdk[http-server]>=0.3.8",
+    "datasets>=3.2.0",
+    "huggingface-hub>=0.27.0",
+    "litellm>=1.59.6",
+    "python-dotenv>=1.0.0",
+    "typer>=0.19.2",
+    "uvicorn>=0.37.0",
+    "httpx>=0.28.1",
+    "duckduckgo-search>=7.3.1",
+    "pillow>=11.0.0",
+]

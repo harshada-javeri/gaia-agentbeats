@@ -1,0 +1,25 @@
+[agent]
+name = "gaia_purple_agent"
+description = "Purple agent for GAIA benchmark - executes complex tasks with web search, calculation, and multi-step reasoning capabilities"
+version = "1.0.0"
+
+[[agent.skills]]
+id = "gaia_task_execution"
+name = "GAIA Task Execution"
+description = "Executes GAIA benchmark tasks requiring multi-step reasoning, web search via DuckDuckGo, Python calculations, and file analysis"
+tags = ["gaia", "reasoning", "tools", "multimodal", "web-search", "calculator"]
+examples = [
+  "Search the web for current information and synthesize answers",
+  "Perform mathematical calculations on numerical data",
+  "Reason through multi-step problems requiring tool orchestration"
+]
+
+[[agent.tools]]
+id = "web_search"
+name = "Web Search"
+description = "Search the web using DuckDuckGo for up-to-date information"
+
+[[agent.tools]]
+id = "python_calculator"
+name = "Python Calculator"
+description = "Evaluate Python mathematical expressions with math library support"
