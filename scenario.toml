@@ -1,0 +1,13 @@
+[green_agent]
+endpoint = "http://127.0.0.1:9001"
+cmd = "python src/green_agent/agent.py --host 127.0.0.1 --port 9001"
+
+[[participants]]
+role = "executor"
+endpoint = "http://127.0.0.1:9002"
+cmd = "python src/purple_agent/agent.py --host 127.0.0.1 --port 9002"
+
+[config]
+level = 1
+split = "validation"
+task_indices = [0, 1, 2]

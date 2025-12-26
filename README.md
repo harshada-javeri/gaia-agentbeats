@@ -22,24 +22,38 @@ This benchmark provides a realistic evaluation of general AI assistant capabilit
 
 ## Architecture
 
+**⭐ Now following AgentBeats Tutorial Standard!** (Based on `tutorial/scenarios/tau2` and `debate`)
+
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Green Agent (Evaluation Orchestrator)                  │
+│  Green Agent (GAIA Evaluator)                           │
+│  - Inherits from GreenAgent base class                  │
+│  - Receives EvalRequest (JSON: participants + config)   │
+│  - Uses ToolProvider for A2A communication              │
 │  - Loads GAIA tasks from Hugging Face                   │
-│  - Sends tasks to purple agent                          │
+│  - Sends tasks to executor agent                        │
 │  - Scores responses against ground truth                │
-│  - Computes accuracy metrics                            │
+│  - Returns structured results via TaskUpdater           │
 └────────────────┬────────────────────────────────────────┘
-                 │ A2A Protocol
+                 │ A2A Protocol (via ToolProvider)
                  ▼
 ┌─────────────────────────────────────────────────────────┐
-│  Purple Agent (Task Executor)                           │
-│  - Receives GAIA task questions                         │
+│  Purple Agent (GAIA Executor)                           │
+│  - Standard AgentExecutor with conversation history     │
 │  - Uses tools: web_search, python_calculator            │
-│  - Performs multi-step reasoning                        │
-│  - Returns final answer                                 │
+│  - Multi-step reasoning with GPT-4o                     │
+│  - Returns answers in <answer>...</answer> format       │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### What's New
+
+✅ **GreenAgent Pattern**: Uses `agentbeats.green_executor.GreenAgent`
+✅ **ToolProvider**: Clean A2A comms via `agentbeats.tool_provider.ToolProvider`
+✅ **Standardized Format**: `EvalRequest`/`EvalResult` for platform compatibility
+✅ **Separate Dockerfiles**: `Dockerfile.gaia-evaluator` + `Dockerfile.gaia-executor`
+✅ **Local Testing**: `scenario.toml` for easy dev/testing
+✅ **Competition Ready**: Follows AgentX-AgentBeats best practices
 
 ## Quick Start
 

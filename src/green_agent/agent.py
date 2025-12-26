@@ -1,50 +1,51 @@
-"""Green agent implementation - GAIA evaluation orchestrator."""
+"""
+GAIA Evaluator - Green agent that runs GAIA benchmark evaluation on purple agents.
+
+This agent:
+1. Loads GAIA tasks from Hugging Face
+2. Sends questions to the purple agent (the agent being tested)
+3. Parses responses and extracts answers
+4. Scores against ground truth and collects metrics
+"""
+import argparse
+import asyncio
+import json
+import logging
+import time
+from typing import Any, Dict
 
 import uvicorn
-import tomllib
-import dotenv
-import json
-import time
-from typing import Dict, Any
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import AgentCard, SendMessageSuccessResponse, Message
-from a2a.utils import new_agent_text_message, get_text_parts
+from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
+from a2a.types import (
+    AgentCapabilities,
+    AgentCard,
+    AgentSkill,
+    DataPart,
+    Part,
+    TaskState,
+    TextPart,
+)
+from a2a.utils import new_agent_text_message
+
+from agentbeats.green_executor import GreenAgent, GreenExecutor
+from agentbeats.models import EvalRequest
+from agentbeats.tool_provider import ToolProvider
 
 from src.utils.parse_tags import parse_tags
-from src.utils import a2a_helpers
 from src.utils.gaia_loader import GAIADatasetLoader
 
-dotenv.load_dotenv()
-
-
-def load_agent_card_toml(agent_name: str) -> Dict[str, Any]:
-    """Load agent card from TOML file.
-
-    Args:
-        agent_name: Name of the agent
-
-    Returns:
-        Agent card dictionary
-    """
-    current_dir = __file__.rsplit("/", 1)[0]
-    with open(f"{current_dir}/{agent_name}.toml", "rb") as f:
-        return tomllib.load(f)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("gaia_evaluator")
 
 
 def normalize_answer(answer: str) -> str:
-    """Normalize an answer for comparison.
-
-    Args:
-        answer: Answer string
-
-    Returns:
-        Normalized answer (lowercase, stripped)
-    """
+    """Normalize an answer for comparison."""
     return answer.strip().lower()
 
 
@@ -79,28 +80,141 @@ def check_answer_correctness(
     return False
 
 
-async def evaluate_purple_agent_on_task(
-    purple_agent_url: str, task: Dict[str, Any], max_turns: int = 5
-) -> Dict[str, Any]:
-    """Evaluate purple agent on a GAIA task.
+class GAIAEvaluator(GreenAgent):
+    """Green agent that evaluates purple agents using GAIA benchmark."""
 
-    Args:
-        purple_agent_url: URL of the purple agent
-        task: GAIA task dictionary
-        max_turns: Maximum conversation turns
+    def __init__(self):
+        self._required_roles = ["executor"]  # The purple agent being tested
+        self._required_config_keys = ["level", "split"]
+        self._tool_provider = ToolProvider()
+        self._loader = GAIADatasetLoader()
 
-    Returns:
-        Evaluation results dictionary
-    """
-    question = task["Question"]
-    ground_truth = task.get("Final answer", None)
-    task_id = task.get("task_id", "unknown")
+    def validate_request(self, request: EvalRequest) -> tuple[bool, str]:
+        missing_roles = set(self._required_roles) - set(request.participants.keys())
+        if missing_roles:
+            return False, f"Missing roles: {missing_roles}"
+        missing_config_keys = set(self._required_config_keys) - set(request.config.keys())
+        if missing_config_keys:
+            return False, f"Missing config keys: {missing_config_keys}"
+        return True, "ok"
 
-    print(f"\n[Green Agent] Evaluating task {task_id}")
-    print(f"[Green Agent] Question: {question}")
+    async def run_eval(self, req: EvalRequest, updater: TaskUpdater) -> None:
+        logger.info(f"Starting GAIA evaluation: {req}")
+        start_time = time.time()
 
-    # Prepare task message for purple agent
-    task_message = f"""You are solving a GAIA benchmark task. Provide your final answer clearly.
+        level = req.config["level"]
+        split = req.config["split"]
+        task_indices = req.config.get("task_indices", [0])
+
+        # Get the purple agent URL
+        executor_url = str(req.participants["executor"])
+
+        logger.info(f"Evaluating {len(task_indices)} tasks - Level {level}, Split: {split}")
+
+        await updater.update_status(
+            TaskState.working,
+            new_agent_text_message(
+                f"Starting GAIA evaluation: Level {level}, {len(task_indices)} tasks"
+            )
+        )
+
+        metrics: Dict[str, Any] = {"tasks": {}}
+
+        try:
+            # Load tasks
+            tasks = self._loader.get_task_batch(level, split, task_indices)
+            logger.info(f"Loaded {len(tasks)} tasks from GAIA dataset")
+
+            for task in tasks:
+                task_id = task.get("task_id", "unknown")
+                logger.info(f"Running task {task_id}...")
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(f"Running task {task_id}...")
+                )
+
+                try:
+                    result = await self._run_single_task(
+                        executor_url=executor_url,
+                        task=task,
+                    )
+                    metrics["tasks"][task_id] = result
+                    logger.info(f"Task {task_id} completed: {result.get('is_correct')}")
+                except Exception as e:
+                    logger.error(f"Task {task_id} failed: {e}")
+                    metrics["tasks"][task_id] = {
+                        "task_id": task_id,
+                        "error": str(e),
+                        "is_correct": False,
+                    }
+
+            # Compute final metrics
+            time_used = time.time() - start_time
+            total_tasks = len(metrics["tasks"])
+            correct_tasks = sum(
+                1 for r in metrics["tasks"].values() if r.get("is_correct") is True
+            )
+            error_tasks = sum(
+                1 for r in metrics["tasks"].values() if "error" in r
+            )
+            accuracy = (correct_tasks / total_tasks * 100) if total_tasks > 0 else 0
+            avg_time = time_used / total_tasks if total_tasks > 0 else 0
+
+            result_data = {
+                "level": level,
+                "split": split,
+                "score": correct_tasks,
+                "max_score": total_tasks,
+                "accuracy": accuracy,
+                "errors": error_tasks,
+                "task_results": metrics["tasks"],
+                "time_used": time_used,
+                "avg_time": avg_time,
+            }
+
+            # Format task results for display
+            task_results_str = "\n".join(
+                f"  {task_id}: {'✓' if result.get('is_correct') else '✗'}"
+                for task_id, result in metrics["tasks"].items()
+            )
+
+            summary = f"""GAIA Benchmark Results
+Level: {level}
+Split: {split}
+Tasks: {total_tasks}
+Accuracy: {accuracy:.1f}% ({correct_tasks}/{total_tasks})
+Errors: {error_tasks}
+Time: {time_used:.1f}s (avg: {avg_time:.1f}s/task)
+
+Task Results:
+{task_results_str}"""
+
+            await updater.add_artifact(
+                parts=[
+                    Part(root=TextPart(text=summary)),
+                    Part(root=DataPart(data=result_data)),
+                ],
+                name="Result",
+            )
+
+        finally:
+            self._tool_provider.reset()
+
+    async def _run_single_task(
+        self,
+        executor_url: str,
+        task: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Run a single GAIA task and return the result."""
+
+        question = task["Question"]
+        ground_truth = task.get("Final answer", None)
+        task_id = task.get("task_id", "unknown")
+
+        logger.info(f"Task {task_id}: {question[:100]}...")
+
+        # Build task prompt for purple agent
+        task_prompt = f"""You are solving a GAIA benchmark task. Provide your final answer clearly.
 
 Question: {question}
 
@@ -108,179 +222,101 @@ Use the available tools (web_search, python_calculator) as needed to solve this 
 Once you have the answer, provide it in this format:
 <answer>YOUR_ANSWER_HERE</answer>"""
 
-    # Send to purple agent
-    print(f"[Green Agent] Sending task to purple agent at {purple_agent_url}")
-    start_time = time.time()
+        # Send to purple agent
+        start_time = time.time()
 
-    try:
-        response = await a2a_helpers.send_message(purple_agent_url, task_message)
-        elapsed_time = time.time() - start_time
+        try:
+            response = await self._tool_provider.talk_to_agent(
+                message=task_prompt,
+                url=executor_url,
+                new_conversation=True,  # Each task is a fresh conversation
+            )
 
-        # Extract response
-        res_root = response.root
-        assert isinstance(res_root, SendMessageSuccessResponse)
-        res_result = res_root.result
-        assert isinstance(res_result, Message)
+            elapsed_time = time.time() - start_time
 
-        text_parts = get_text_parts(res_result.parts)
-        assert len(text_parts) > 0, "No text response from purple agent"
+            logger.debug(f"Purple agent response: {response[:200]}...")
 
-        purple_response = text_parts[0]
-        print(f"[Green Agent] Purple agent response: {purple_response[:200]}...")
+            # Extract answer from <answer>...</answer> tags
+            tags = parse_tags(response)
+            predicted_answer = tags.get("answer", response)
 
-        # Extract answer
-        tags = parse_tags(purple_response)
-        predicted_answer = tags.get("answer", purple_response)
+            # Check correctness
+            is_correct = None
+            if ground_truth:
+                is_correct = check_answer_correctness(predicted_answer, ground_truth)
+                logger.info(f"Predicted: {predicted_answer}, Ground truth: {ground_truth}, Correct: {is_correct}")
 
-        # Check correctness (if ground truth available)
-        is_correct = None
-        if ground_truth:
-            is_correct = check_answer_correctness(predicted_answer, ground_truth)
-            print(f"[Green Agent] Correctness: {is_correct}")
-            print(f"[Green Agent] Predicted: {predicted_answer}")
-            print(f"[Green Agent] Ground truth: {ground_truth}")
+            return {
+                "task_id": task_id,
+                "question": question,
+                "predicted_answer": predicted_answer,
+                "ground_truth": ground_truth,
+                "is_correct": is_correct,
+                "elapsed_time": elapsed_time,
+                "full_response": response,
+            }
 
-        return {
-            "task_id": task_id,
-            "question": question,
-            "predicted_answer": predicted_answer,
-            "ground_truth": ground_truth,
-            "is_correct": is_correct,
-            "elapsed_time": elapsed_time,
-            "full_response": purple_response,
-        }
-
-    except Exception as e:
-        print(f"[Green Agent] Error evaluating task: {e}")
-        return {
-            "task_id": task_id,
-            "question": question,
-            "error": str(e),
-            "is_correct": False,
-            "elapsed_time": time.time() - start_time,
-        }
+        except Exception as e:
+            logger.error(f"Error evaluating task: {e}")
+            return {
+                "task_id": task_id,
+                "question": question,
+                "error": str(e),
+                "is_correct": False,
+                "elapsed_time": time.time() - start_time,
+            }
 
 
-class GAIAGreenAgentExecutor(AgentExecutor):
-    """Executor for green agent - orchestrates GAIA evaluation."""
-
-    def __init__(self):
-        self.loader = GAIADatasetLoader()
-
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        """Execute GAIA evaluation workflow.
-
-        Expected user input format:
-        <purple_agent_url>http://localhost:9002</purple_agent_url>
-        <eval_config>
-        {
-            "level": 1,
-            "split": "validation",
-            "task_indices": [0, 1, 2]
-        }
-        </eval_config>
-        """
-        print("[Green Agent] Received evaluation request")
-        user_input = context.get_user_input()
-
-        # Parse task configuration
-        tags = parse_tags(user_input)
-        purple_agent_url = tags["purple_agent_url"]
-        eval_config_str = tags["eval_config"]
-        eval_config = json.loads(eval_config_str)
-
-        level = eval_config["level"]
-        split = eval_config["split"]
-        task_indices = eval_config["task_indices"]
-
-        print(f"[Green Agent] Configuration:")
-        print(f"  Level: {level}")
-        print(f"  Split: {split}")
-        print(f"  Task indices: {task_indices}")
-
-        # Load tasks
-        print("[Green Agent] Loading GAIA tasks...")
-        tasks = self.loader.get_task_batch(level, split, task_indices)
-        print(f"[Green Agent] Loaded {len(tasks)} tasks")
-
-        # Evaluate each task
-        results = []
-        for task in tasks:
-            result = await evaluate_purple_agent_on_task(purple_agent_url, task)
-            results.append(result)
-
-        # Compute metrics
-        total_tasks = len(results)
-        correct_tasks = sum(1 for r in results if r.get("is_correct") is True)
-        error_tasks = sum(1 for r in results if "error" in r)
-        avg_time = sum(r.get("elapsed_time", 0) for r in results) / max(
-            total_tasks, 1
-        )
-
-        accuracy = correct_tasks / total_tasks if total_tasks > 0 else 0.0
-
-        # Prepare summary
-        summary = {
-            "level": level,
-            "split": split,
-            "total_tasks": total_tasks,
-            "correct": correct_tasks,
-            "errors": error_tasks,
-            "accuracy": accuracy,
-            "avg_time_seconds": avg_time,
-            "results": results,
-        }
-
-        print("\n[Green Agent] ===== EVALUATION COMPLETE =====")
-        print(f"Accuracy: {accuracy:.2%} ({correct_tasks}/{total_tasks})")
-        print(f"Errors: {error_tasks}")
-        print(f"Average time: {avg_time:.2f}s")
-
-        # Send results
-        summary_text = f"""GAIA Evaluation Complete ✅
-
-Level: {level}
-Split: {split}
-Tasks evaluated: {total_tasks}
-Correct: {correct_tasks}
-Accuracy: {accuracy:.2%}
-Errors: {error_tasks}
-Average time: {avg_time:.2f}s
-
-Detailed results:
-{json.dumps(summary, indent=2)}
-"""
-
-        await event_queue.enqueue_event(new_agent_text_message(summary_text))
-
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        """Cancel execution (not implemented)."""
-        raise NotImplementedError
+def gaia_evaluator_agent_card(name: str, url: str) -> AgentCard:
+    """Create the agent card for the GAIA evaluator."""
+    skill = AgentSkill(
+        id="gaia_evaluation",
+        name="GAIA Benchmark Evaluation",
+        description="Evaluates agents on GAIA (General AI Assistants) benchmark tasks requiring multi-step reasoning, web search, and tool use",
+        tags=["benchmark", "evaluation", "gaia", "reasoning"],
+        examples=[
+            '{"participants": {"executor": "http://localhost:9002"}, "config": {"level": 1, "split": "validation", "task_indices": [0, 1, 2]}}'
+        ],
+    )
+    return AgentCard(
+        name=name,
+        description="GAIA benchmark evaluator - tests agents on general AI assistant tasks",
+        url=url,
+        version="1.0.0",
+        default_input_modes=["text"],
+        default_output_modes=["text"],
+        capabilities=AgentCapabilities(streaming=True),
+        skills=[skill],
+    )
 
 
-def start_green_agent(
-    agent_name: str = "gaia_green_agent", host: str = "localhost", port: int = 9001
-):
-    """Start the green agent server.
+async def main():
+    parser = argparse.ArgumentParser(description="Run the GAIA evaluator agent.")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind the server")
+    parser.add_argument("--port", type=int, default=9001, help="Port to bind the server")
+    parser.add_argument("--card-url", type=str, help="External URL for the agent card")
+    args = parser.parse_args()
 
-    Args:
-        agent_name: Name of the agent
-        host: Host to bind to
-        port: Port to bind to
-    """
-    print(f"Starting green agent on {host}:{port}...")
-    agent_card_dict = load_agent_card_toml(agent_name)
-    url = f"http://{host}:{port}"
-    agent_card_dict["url"] = url
+    agent_url = args.card_url or f"http://{args.host}:{args.port}/"
+
+    agent = GAIAEvaluator()
+    executor = GreenExecutor(agent)
+    agent_card = gaia_evaluator_agent_card("GAIAEvaluator", agent_url)
 
     request_handler = DefaultRequestHandler(
-        agent_executor=GAIAGreenAgentExecutor(),
+        agent_executor=executor,
         task_store=InMemoryTaskStore(),
     )
 
-    app = A2AStarletteApplication(
-        agent_card=AgentCard(**agent_card_dict),
+    server = A2AStarletteApplication(
+        agent_card=agent_card,
         http_handler=request_handler,
     )
 
-    uvicorn.run(app.build(), host=host, port=port)
+    uvicorn_config = uvicorn.Config(server.build(), host=args.host, port=args.port)
+    uvicorn_server = uvicorn.Server(uvicorn_config)
+    await uvicorn_server.serve()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
