@@ -11,3 +11,10 @@ cmd = "python src/purple_agent/agent.py --host 127.0.0.1 --port 9002"
 level = 1
 split = "validation"
 task_indices = [0, 1, 2]
+
+# Leaderboard submission configuration
+submit_to_leaderboard = true
+agent_name = "gaia-benchmark-agent"
+agent_version = "1.0.0"
+team_name = "agentbeats"
+model_used = "gpt-4o"

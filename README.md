@@ -100,6 +100,120 @@ python main.py green    # Terminal 1: Start green agent
 python main.py purple   # Terminal 2: Start purple agent
 ```
 
+## Leaderboard Integration
+
+The system includes a comprehensive leaderboard for tracking benchmark results across agents and teams.
+
+### Features
+
+✅ **Automatic Submission**: Results submitted automatically after evaluation completes  
+✅ **GitHub Webhook Integration**: Submit via GitHub commits and PRs  
+✅ **REST API**: Query leaderboard, teams, and submission history  
+✅ **Database Persistence**: SQLite (local) or PostgreSQL (production)  
+✅ **Ranking System**: Automatic ranking by accuracy and performance  
+✅ **Audit Trail**: Complete webhook event logging  
+
+### Quick Start
+
+```bash
+# 1. Initialize database
+python scripts/setup_db.py init
+
+# 2. Start leaderboard API
+python -m src.leaderboard_api
+
+# 3. Get leaderboard
+curl http://localhost:8000/leaderboard?level=1&split=validation
+
+# 4. Create submission
+curl -X POST http://localhost:8000/submissions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_name": "my-agent",
+    "agent_version": "1.0.0",
+    "team_name": "my-team",
+    "level": 1,
+    "split": "validation",
+    "accuracy": 75.5,
+    "correct_tasks": 22,
+    "total_tasks": 30,
+    "average_time_per_task": 2.3,
+    "total_time_seconds": 69.0
+  }'
+```
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/leaderboard` | GET | Get top agents for level/split |
+| `/leaderboard/teams` | GET | Get team leaderboard |
+| `/submissions/{id}` | GET | Get submission details |
+| `/agents/{name}/history` | GET | Get agent submission history |
+| `/teams/{name}/history` | GET | Get team submission history |
+| `/recent` | GET | Get recent submissions |
+| `/stats` | GET | Get overall statistics |
+| `/submissions` | POST | Create direct submission |
+| `/webhooks/github` | POST | GitHub webhook endpoint |
+
+See [LEADERBOARD_SETUP.md](docs/LEADERBOARD_SETUP.md) for complete documentation.
+
+### GitHub Webhook Submission
+
+Submit results directly from GitHub commits or pull requests:
+
+```bash
+git commit -m "Improved agent
+
+{
+  \"gaia_submission\": {
+    \"agent_name\": \"improved-agent\",
+    \"agent_version\": \"2.0.0\",
+    \"team_name\": \"my-team\",
+    \"level\": 1,
+    \"split\": \"validation\",
+    \"accuracy\": 85.0,
+    \"correct_tasks\": 25,
+    \"total_tasks\": 30,
+    \"average_time_per_task\": 2.1,
+    \"total_time_seconds\": 63.0
+  }
+}
+"
+
+git push
+```
+
+See [WEBHOOK_EXAMPLES.md](docs/WEBHOOK_EXAMPLES.md) for detailed examples and CI/CD integration.
+
+### Configuration
+
+Add to `scenario.toml` to enable leaderboard submission:
+
+```toml
+[config]
+level = 1
+split = "validation"
+task_indices = [0, 1, 2]
+
+# Leaderboard settings
+submit_to_leaderboard = true
+agent_name = "my-agent"
+agent_version = "1.0.0"
+team_name = "my-team"
+model_used = "gpt-4o"
+```
+
+Or via environment variables:
+
+```bash
+export DATABASE_URL="sqlite:///./leaderboard.db"
+export GITHUB_WEBHOOK_SECRET="your-webhook-secret"
+export LEADERBOARD_API_HOST="0.0.0.0"
+export LEADERBOARD_API_PORT="8000"
+```
+
+
 ## Usage Examples
 
 ### Evaluate Specific Tasks
