@@ -1,20 +1,15 @@
 [green_agent]
-endpoint = "http://127.0.0.1:9001"
-cmd = "python src/green_agent/agent.py --host 127.0.0.1 --port 9001"
+agentbeats_id = ""  # Your green agent ID from agentbeats.dev
+image = "ghcr.io/yourusername/gaia-evaluator:v1.0"  # Your published image
+env = { OPENAI_API_KEY = "${OPENAI_API_KEY}" }
 
 [[participants]]
-role = "executor"
-endpoint = "http://127.0.0.1:9002"
-cmd = "python src/purple_agent/agent.py --host 127.0.0.1 --port 9002"
+agentbeats_id = ""  # Your purple agent ID from agentbeats.dev
+name = "executor"
+image = "ghcr.io/yourusername/gaia-executor:v1.0"  # Your published image
+env = { OPENAI_API_KEY = "${OPENAI_API_KEY}" }
 
 [config]
 level = 1
 split = "validation"
 task_indices = [0, 1, 2]
-
-# Leaderboard submission configuration
-submit_to_leaderboard = true
-agent_name = "gaia-benchmark-agent"
-agent_version = "1.0.0"
-team_name = "agentbeats"
-model_used = "gpt-4o"

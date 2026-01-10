@@ -36,11 +36,9 @@ from a2a.utils import new_agent_text_message
 from agentbeats.green_executor import GreenAgent, GreenExecutor
 from agentbeats.models import EvalRequest
 from agentbeats.tool_provider import ToolProvider
-from agentbeats.database import SessionLocal, Submission
 
 from src.utils.parse_tags import parse_tags
 from src.utils.gaia_loader import GAIADatasetLoader
-from src.utils.leaderboard_queries import LeaderboardQueries
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("gaia_evaluator")
@@ -199,90 +197,10 @@ Task Results:
                 name="Result",
             )
 
-            # Submit to leaderboard if enabled
-            await self._submit_to_leaderboard(req, result_data, metrics["tasks"])
+            # Results are output as A2A artifacts for AgentBeats platform
 
         finally:
             self._tool_provider.reset()
-
-    async def _submit_to_leaderboard(
-        self,
-        req: EvalRequest,
-        result_data: Dict[str, Any],
-        task_results: Dict[str, Any],
-    ) -> None:
-        """Submit evaluation results to leaderboard database.
-
-        Args:
-            req: The evaluation request
-            result_data: Computed metrics from evaluation
-            task_results: Per-task results
-        """
-        try:
-            # Check if leaderboard submission is enabled
-            if not req.config.get("submit_to_leaderboard", True):
-                logger.info("Leaderboard submission disabled in config")
-                return
-
-            import uuid
-            from datetime import datetime
-
-            db = SessionLocal()
-            try:
-                # Extract submission metadata
-                agent_name = req.config.get("agent_name", "unknown")
-                agent_version = req.config.get("agent_version", "1.0.0")
-                team_name = req.config.get("team_name")
-                github_repo = req.config.get("github_repo")
-                github_commit = req.config.get("github_commit")
-                github_branch = req.config.get("github_branch")
-                model_used = req.config.get("model_used", "gpt-4o")
-
-                submission_id = f"eval-{uuid.uuid4().hex[:12]}"
-
-                # Create submission record
-                submission = Submission(
-                    submission_id=submission_id,
-                    agent_name=agent_name,
-                    agent_version=agent_version,
-                    team_name=team_name,
-                    level=result_data["level"],
-                    split=result_data["split"],
-                    total_tasks=result_data["max_score"],
-                    correct_tasks=result_data["score"],
-                    accuracy=result_data["accuracy"],
-                    errors=result_data["errors"],
-                    total_time_seconds=result_data["time_used"],
-                    average_time_per_task=result_data["avg_time"],
-                    task_results=task_results,
-                    github_repo=github_repo,
-                    github_commit_hash=github_commit,
-                    github_branch=github_branch,
-                    model_used=model_used,
-                    environment="agentbeats",
-                    timestamp=datetime.utcnow(),
-                )
-
-                db.add(submission)
-                db.commit()
-                db.refresh(submission)
-
-                logger.info(f"✅ Submitted to leaderboard: {submission_id}")
-                logger.info(f"   Agent: {agent_name} v{agent_version}")
-                logger.info(f"   Level: {result_data['level']}, Accuracy: {result_data['accuracy']:.1f}%")
-
-                # Refresh leaderboard rankings
-                count = LeaderboardQueries.refresh_leaderboard(db)
-                logger.info(f"🔄 Leaderboard refreshed with {count} entries")
-
-            except Exception as e:
-                logger.error(f"Error submitting to leaderboard: {e}")
-                db.rollback()
-            finally:
-                db.close()
-
-        except Exception as e:
-            logger.error(f"Leaderboard submission failed: {e}")
 
     async def _run_single_task(
         self,
