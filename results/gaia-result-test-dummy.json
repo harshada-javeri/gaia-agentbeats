@@ -1,0 +1,50 @@
+{
+  "submission_id": "test-1234-5678-abcd-efgh12345678",
+  "timestamp": "2026-01-16T10:30:00.000000",
+  "participants": {
+    "agent": "test-agent-9999-8888-7777-666655554444"
+  },
+  "config": {
+    "level": 1,
+    "split": "validation",
+    "domain": "benchmark"
+  },
+  "results": [
+    {
+      "task_id": 10,
+      "status": "completed",
+      "score": 1.0,
+      "time_used": 1.8,
+      "max_score": 1
+    },
+    {
+      "task_id": 11,
+      "status": "completed",
+      "score": 1.0,
+      "time_used": 2.2,
+      "max_score": 1
+    },
+    {
+      "task_id": 12,
+      "status": "completed",
+      "score": 1.0,
+      "time_used": 2.9,
+      "max_score": 1
+    },
+    {
+      "task_id": 13,
+      "status": "completed",
+      "score": 1.0,
+      "time_used": 3.1,
+      "max_score": 1
+    }
+  ],
+  "summary": {
+    "total_tasks": 4,
+    "completed_tasks": 4,
+    "passed_tasks": 4,
+    "accuracy": 1.0,
+    "total_time": 10.0,
+    "average_time_per_task": 2.5
+  }
+}
