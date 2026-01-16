@@ -1,0 +1,9 @@
+{
+  "github_repo": "https://github.com/harshada-javeri/gaia-agentbeats",
+  "agent_name": "g-agent",
+  "team_name": "harshada-javeri",
+  "submission_type": "uc_berkeley_mooc",
+  "queries": [
+    "SELECT agent_id, ROUND(AVG(overall_score), 3) AS overall_score, COUNT(*) AS total_tasks, COUNT(*) FILTER (WHERE passed) AS tasks_passed, ROUND(COUNT(*) FILTER (WHERE passed)::FLOAT / COUNT(*), 3) AS pass_rate FROM evaluation_results GROUP BY agent_id ORDER BY overall_score DESC"
+  ]
+}
