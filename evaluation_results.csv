@@ -1,0 +1,17 @@
+agent_id,task_id,overall_score,passed
+5rd585cb-b9a7-4bcd-b7a7-7368ffe06a13,2,1.0,True
+5rd585cb-b9a7-4bcd-b7a7-7368ffe06a13,2,1.0,True
+5rd585cb-b9a7-4bcd-b7a7-7368ffe06a13,2,0.5,False
+0ed585cb-b9a7-4bcd-b7a7-7368ffe06a13,0,1.0,True
+0ed585cb-b9a7-4bcd-b7a7-7368ffe06a13,1,1.0,True
+0ed585cb-b9a7-4bcd-b7a7-7368ffe06a13,2,0.5,False
+test-agent-9999-8888-7777-666655554444,10,1.0,True
+test-agent-9999-8888-7777-666655554444,11,1.0,True
+test-agent-9999-8888-7777-666655554444,12,1.0,True
+test-agent-9999-8888-7777-666655554444,13,1.0,True
+1ed585cb-b9s7-4bcd-b7a7-7368ffe06a13,0,1.0,True
+1ed585cb-b9s7-4bcd-b7a7-7368ffe06a13,1,1.0,True
+1ed585cb-b9s7-4bcd-b7a7-7368ffe06a13,2,0.5,False
+9rd585cb-b9a7-4bcd-b7a7-7368ffe06a13,2,1.0,True
+9rd585cb-b9a7-4bcd-b7a7-7368ffe06a13,8,1.0,True
+9rd585cb-b9a7-4bcd-b7a7-7368ffe06a13,2,0.5,False
