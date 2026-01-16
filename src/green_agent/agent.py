@@ -33,7 +33,7 @@ from a2a.types import (
 )
 from a2a.utils import new_agent_text_message
 
-from agentbeats.green_executor import GreenAgent, GreenExecutor
+from agentbeats import AgentBeatsExecutor
 from agentbeats.models import EvalRequest
 from agentbeats.tool_provider import ToolProvider
 
@@ -80,7 +80,7 @@ def check_answer_correctness(
     return False
 
 
-class GAIAEvaluator(GreenAgent):
+class GAIAEvaluator:
     """Green agent that evaluates purple agents using GAIA benchmark."""
 
     def __init__(self):
@@ -302,7 +302,7 @@ async def main():
     agent_url = args.card_url or f"http://{args.host}:{args.port}/"
 
     agent = GAIAEvaluator()
-    executor = GreenExecutor(agent)
+    executor = AgentBeatsExecutor(agent)
     agent_card = gaia_evaluator_agent_card("GAIAEvaluator", agent_url)
 
     request_handler = DefaultRequestHandler(
