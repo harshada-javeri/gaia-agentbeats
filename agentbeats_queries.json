@@ -1,6 +1,6 @@
 [
   {
     "name": "Overall Performance",
-    "query": "SELECT agent_id, ROUND(AVG(overall_score), 3) AS overall_score, COUNT(*) AS total_tasks, SUM(CASE WHEN passed THEN 1 ELSE 0 END) AS tasks_passed, ROUND(SUM(CASE WHEN passed THEN 1.0 ELSE 0.0 END) / COUNT(*), 3) AS pass_rate FROM read_csv_auto('evaluation_results.csv') GROUP BY agent_id ORDER BY overall_score DESC"
+    "query": "SELECT agent_id, ROUND(AVG(overall_score), 3) AS overall_score, COUNT(*) AS total_tasks, SUM(CASE WHEN passed THEN 1 ELSE 0 END) AS tasks_passed, ROUND(SUM(CASE WHEN passed THEN 1.0 ELSE 0.0 END) / COUNT(*), 3) AS pass_rate FROM 'evaluation_results.parquet' GROUP BY agent_id ORDER BY overall_score DESC"
   }
 ]
