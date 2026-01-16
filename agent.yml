@@ -1,0 +1,4 @@
+name: g-agent
+category: multi-agent-evaluation
+description: GAIA AgentBeats evaluator
+docker_image: ghcr.io/harshada-javeri/gaia-agentbeats:latest
