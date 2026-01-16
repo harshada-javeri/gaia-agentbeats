@@ -1,6 +1,6 @@
 [
   {
     "name": "Overall Performance",
-    "query": "SELECT agent_id, ROUND(AVG(overall_score), 3) AS overall_score, COUNT(*) AS total_tasks, SUM(CASE WHEN passed THEN 1 ELSE 0 END) AS tasks_passed, ROUND(SUM(CASE WHEN passed THEN 1.0 ELSE 0.0 END) / COUNT(*), 3) AS pass_rate FROM 'evaluation_results.parquet' GROUP BY agent_id ORDER BY overall_score DESC"
+    "query": "SELECT id, ROUND(AVG(score), 3) AS avg_score, COUNT(*) AS total_tasks, SUM(CASE WHEN score >= max_score THEN 1 ELSE 0 END) AS tasks_passed, ROUND(CAST(SUM(CASE WHEN score >= max_score THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*), 3) AS pass_rate FROM (SELECT t.participants.agent AS id, r.result.score AS score, r.result.max_score AS max_score FROM results t CROSS JOIN UNNEST(t.results) AS r(result)) GROUP BY id ORDER BY avg_score DESC"
   }
 ]
