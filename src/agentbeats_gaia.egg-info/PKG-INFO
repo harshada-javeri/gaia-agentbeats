@@ -4,6 +4,7 @@ Version: 0.1.0
 Summary: GAIA Benchmark implementation on AgentBeats - Evaluating General AI Assistants with multi-step reasoning and tool use
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
+Requires-Dist: agentbeats>=0.1.0
 Requires-Dist: a2a-sdk[http-server]>=0.3.8
 Requires-Dist: datasets>=3.2.0
 Requires-Dist: huggingface-hub>=0.27.0

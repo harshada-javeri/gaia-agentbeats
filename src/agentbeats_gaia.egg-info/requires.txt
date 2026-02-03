@@ -1,3 +1,4 @@
+agentbeats>=0.1.0
 a2a-sdk[http-server]>=0.3.8
 datasets>=3.2.0
 huggingface-hub>=0.27.0
